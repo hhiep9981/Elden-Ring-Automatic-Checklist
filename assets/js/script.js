@@ -25,18 +25,12 @@ fileSelector.addEventListener("change", (event) => {
 
   let reader = new FileReader();
   reader.onload = function (e) {
-    file_read = e.target.result;
-    if (!buffer_equal(file_read["slice"](0, 4), new Int8Array([66, 78, 68, 52]))) {
-      e.target.result = null;
-      document.getElementById("slot_select").style.display = "none";
+    if (!loadSaveBuffer(e.target.result)) {
       alert("Insert a valid file");
       return;
     }
-    updateSlotDropdown(getNames(file_read));
-    $("#slot_selector").on("change", function (e) {
-      $("#setting_buttons").css("display", "block")
-      $("#calculate").css("display", "block")
-    });
+    // Store the save online so other devices open it automatically
+    if (typeof cloudSave === "function") cloudSave(file);
   };
   reader.onerror = function (e) {
     // error occurred
@@ -44,6 +38,107 @@ fileSelector.addEventListener("change", (event) => {
   };
   reader.readAsArrayBuffer(file);
 });
+
+// Load a save file (ArrayBuffer) into the page. Returns false if it is not a valid save.
+function loadSaveBuffer(buffer, preferredSlot = null) {
+  if (!buffer || !buffer_equal(buffer.slice(0, 4), new Int8Array([66, 78, 68, 52]))) {
+    document.getElementById("slot_select").style.display = "none";
+    return false;
+  }
+  file_read = buffer;
+  const names = getNames(file_read);
+  updateSlotDropdown(names);
+  $("#slot_selector").on("change", function () {
+    onSlotSelected(this.value);
+  });
+  if (preferredSlot !== null && names[preferredSlot]) {
+    $("#slot_selector").val(String(preferredSlot));
+    onSlotSelected(preferredSlot);
+  }
+  return true;
+}
+
+function onSlotSelected(slotIndex) {
+  $("#setting_buttons").css("display", "block");
+  $("#calculate").css("display", "block");
+  try {
+    localStorage.setItem("er_last_slot", String(slotIndex));
+  } catch (e) {}
+  if (typeof cloudSaveSlot === "function") cloudSaveSlot(slotIndex);
+  renderCharacterStats(getCharacterStats(file_read, slotIndex));
+}
+
+// Offset of PlayerGameData inside a slot (right after the variable-size ga_items block)
+function getPlayerGameDataOffset(slot) {
+  const view = new DataView(slot.buffer, slot.byteOffset, slot.byteLength);
+  let offset = 4 + 4 + 0x18;
+  for (let i = 0; i < 0x1400; i++) {
+    let item_id = view.getUint32(offset + 4, true);
+    offset += 8;
+    if (item_id !== 0 && (item_id & 0xf0000000) === 0) {
+      offset += 13;
+    } else if (item_id !== 0 && (item_id & 0xf0000000) === 0x10000000) {
+      offset += 8;
+    }
+  }
+  return offset;
+}
+
+function getCharacterStats(file_read, selected_slot) {
+  const slot = get_slot_ls(new Uint8Array(file_read))[selected_slot];
+  const view = new DataView(slot.buffer, slot.byteOffset, slot.byteLength);
+  const base = getPlayerGameDataOffset(slot);
+  const i32 = (off) => view.getInt32(base + off, true);
+  let name = "";
+  for (let k = 0; k < 16; k++) {
+    const c = view.getUint16(base + 0x94 + k * 2, true);
+    if (c === 0) break;
+    name += String.fromCharCode(c);
+  }
+  return {
+    name,
+    level: i32(0x60),
+    runes: i32(0x64),
+    runeMemory: i32(0x68),
+    hp: i32(0x0c),
+    fp: i32(0x18),
+    stamina: i32(0x28),
+    attributes: {
+      Vigor: i32(0x34),
+      Mind: i32(0x38),
+      Endurance: i32(0x3c),
+      Strength: i32(0x40),
+      Dexterity: i32(0x44),
+      Intelligence: i32(0x48),
+      Faith: i32(0x4c),
+      Arcane: i32(0x50),
+    },
+  };
+}
+
+function renderCharacterStats(s) {
+  const el = document.getElementById("char_stats");
+  const fmt = (n) => Number(n).toLocaleString("en-US");
+  const attrs = Object.entries(s.attributes)
+    .map(([k, v]) => `<div class="char-attr"><span>${k}</span><strong>${v}</strong></div>`)
+    .join("");
+  el.innerHTML = `
+    <div class="char-card">
+      <div class="char-head">
+        <div class="char-name">${s.name.replace(/[<>&]/g, "")}</div>
+        <div class="char-level">Level <strong>${s.level}</strong></div>
+      </div>
+      <div class="char-main">
+        <div><span>Runes held</span><strong>${fmt(s.runes)}</strong></div>
+        <div><span>Total runes earned</span><strong>${fmt(s.runeMemory)}</strong></div>
+        <div><span>HP</span><strong>${s.hp}</strong></div>
+        <div><span>FP</span><strong>${s.fp}</strong></div>
+        <div><span>Stamina</span><strong>${s.stamina}</strong></div>
+      </div>
+      <div class="char-attrs">${attrs}</div>
+    </div>`;
+  el.style.display = "block";
+}
 
 function calculate() {
   let options = $("#slot_selector option:selected");

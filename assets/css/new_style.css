@@ -255,3 +255,20 @@ button[aria-expanded="true"] h3::before {
   color: whitesmoke;
 }
 
+
+/* Cloud sync status */
+.cloud-status { font-size: 0.85rem; margin-top: 6px; color: #b9b4a6; }
+.cloud-status.ok { color: #c19d53; }
+.cloud-status.error { color: #e57373; }
+
+/* Character stats */
+.char-card { background: #2b2a25; border: 1px solid #c19d53; border-radius: 6px; padding: 12px 14px; margin: 10px 0; }
+.char-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid #4a463c; padding-bottom: 8px; margin-bottom: 10px; }
+.char-name { font-family: 'Mantinia Regular', serif; font-size: 1.4rem; color: #c19d53; }
+.char-level { font-size: 1.1rem; }
+.char-level strong { color: #c19d53; font-size: 1.4rem; }
+.char-main, .char-attrs { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.char-attrs { margin-top: 10px; padding-top: 10px; border-top: 1px solid #4a463c; }
+.char-main > div, .char-attr { display: flex; flex-direction: column; background: #1f1e1a; border-radius: 4px; padding: 6px 10px; }
+.char-main span, .char-attr span { font-size: 0.75rem; color: #b9b4a6; text-transform: uppercase; letter-spacing: 0.04em; }
+.char-main strong, .char-attr strong { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
