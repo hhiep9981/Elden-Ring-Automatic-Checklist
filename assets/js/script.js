@@ -480,16 +480,15 @@ function normalizeWikiName(itemName, stripUpgrade = true) {
   let normalized = itemName;
   if (stripUpgrade) {
     normalized = normalized.replace(/ \+\d+$/, ""); // Remove "+10", "+25", etc.
-  } else {
-    normalized = normalized.replace(/ \+/g, "+"); // Remove space before "+" (e.g. " +3" -> "+3")
   }
   normalized = normalized.replace(/\[(\d+)\]/g, "($1)");
-  normalized = normalized.replace(/ /g, "+");
+  normalized = normalized.replace(/ /g, "_"); // wiki.gg (MediaWiki) uses underscores
+  normalized = encodeURIComponent(normalized).replace(/%2F/g, "/").replace(/%3A/g, ":").replace(/%2B/g, "+").replace(/%27/g, "'").replace(/%2C/g, ",");
   return normalized;
 }
 
 function getCardMetadata(itemName, categoryName) {
-  const BASE_URL = "https://eldenring.wiki.fextralife.com";
+  const BASE_URL = "https://eldenring.wiki.gg/wiki";
 
   let cardClass = "card";
   let url = "";
@@ -502,7 +501,7 @@ function getCardMetadata(itemName, categoryName) {
 
     case "graces":
       cardClass += " grace-card";
-      url = `${BASE_URL}/Sites+of+Grace`;
+      url = `${BASE_URL}/Sites_of_Grace`;
       break;
 
     case "bosses": {

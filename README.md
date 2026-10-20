@@ -43,7 +43,7 @@ With this tool you can:
 - View all owned **Weapons**, **Armor**, **Talisman**, **Spells**, **Ashes of War** and **Spirit Ashes**
 - View all not owned **Weapons**, **Armor**, **Talisman**, **Spells**, **Ashes of War** and **Spirit Ashes**
 - All items are **categorized by type**. For example, weapons are divided into daggers, straight swords, axes,...
-- All items have a link that redirects directly to the [wiki page](https://eldenring.wiki.fextralife.com/Elden+Ring+Wiki), with all the information about obtaining the item and various stats.
+- All items have a link that redirects directly to the [wiki page](https://eldenring.wiki.gg/wiki/Elden_Ring_Wiki), with all the information about obtaining the item and various stats.
 
 ## Usage/Locating Elden Ring Save File
 
@@ -53,7 +53,7 @@ With this tool you can:
 
 I planned to add some features:
 
-- Make a section in which armors are divided according to their [armor set](https://eldenring.wiki.fextralife.com/Armor)
+- Make a section in which armors are divided according to their [armor set](https://eldenring.wiki.gg/wiki/Armor)
 
 Know issues:
 
