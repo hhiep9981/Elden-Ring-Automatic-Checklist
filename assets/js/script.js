@@ -116,28 +116,45 @@ function getCharacterStats(file_read, selected_slot) {
   };
 }
 
+// Runes needed to go from `level` to `level + 1`
+function runesForNextLevel(level) {
+  const x = level + 81;
+  if (level < 11) return Math.floor((x * x) / 10);
+  return Math.floor(((2 * (level - 11) + 10) * x * x) / 100);
+}
+
 function renderCharacterStats(s) {
   const el = document.getElementById("char_stats");
-  const fmt = (n) => Number(n).toLocaleString("en-US");
-  const attrs = Object.entries(s.attributes)
-    .map(([k, v]) => `<div class="char-attr"><span>${k}</span><strong>${v}</strong></div>`)
-    .join("");
-  el.innerHTML = `
-    <div class="char-card">
-      <div class="char-head">
-        <div class="char-name">${s.name.replace(/[<>&]/g, "")}</div>
-        <div class="char-level">Level <strong>${s.level}</strong></div>
-      </div>
-      <div class="char-main">
-        <div><span>Runes held</span><strong>${fmt(s.runes)}</strong></div>
-        <div><span>Total runes earned</span><strong>${fmt(s.runeMemory)}</strong></div>
-        <div><span>HP</span><strong>${s.hp}</strong></div>
-        <div><span>FP</span><strong>${s.fp}</strong></div>
-        <div><span>Stamina</span><strong>${s.stamina}</strong></div>
-      </div>
-      <div class="char-attrs">${attrs}</div>
+  const arrow = `<svg viewBox="0 0 15 12" aria-hidden="true"><path d="M0 4.2h8.5V0L15 6l-6.5 6V7.8H0z" fill="currentColor"/></svg>`;
+  const row = (label, cur, next, extraClass = "") => `
+    <div class="stat-row">
+      <span class="label">${label}</span>
+      <span class="cur">${cur}</span>
+      <span class="arrow">${cur === "" ? "" : arrow}</span>
+      <span class="new ${extraClass}"><i class="chev">‹</i>${next}<i class="chev">›</i></span>
     </div>`;
+  const needed = runesForNextLevel(s.level);
+  const attrs = Object.entries(s.attributes)
+    .map(([k, v]) => row(k, v, v))
+    .join("");
+  const icon = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20c0-4 1-7 3-9l-2-3c-.6-1 .2-2.3 1.4-2l3.6 1c1.6.4 2.6 2 2.2 3.6L13 12c2.5-.5 5 .8 6 3.2.6 1.6-.6 3.3-2.3 3.3H8.5" fill="none" stroke="#c9a961" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  el.innerHTML = `
+    <div class="stats-name">${s.name.replace(/[<>&]/g, "")}</div>
+    <div class="stat-group">
+      ${row("Level", s.level, s.level)}
+      <div class="stat-gap"></div>
+      ${row("Runes Held", s.runes, s.runes)}
+      ${row("Runes Needed", "", needed, s.runes < needed ? "short" : "")}
+    </div>
+    <div class="stat-header">${icon}<span>Attribute Points</span></div>
+    <div class="stat-group attrs">${attrs}</div>`;
   el.style.display = "block";
+  const rows = el.querySelectorAll(".attrs .stat-row");
+  rows.forEach((r) => r.addEventListener("mouseenter", () => {
+    rows.forEach((x) => x.classList.remove("is-active"));
+    r.classList.add("is-active");
+  }));
+  if (rows[0]) rows[0].classList.add("is-active");
 }
 
 function calculate() {
@@ -556,18 +573,15 @@ function getNames(file_read) {
 }
 
 function updateSlotDropdown(slot_name_list) {
-  let select = document.getElementById("slot_select");
-  select.innerHTML = `<i class="icofont-rounded-right"></i> <strong>Select slot: </strong>
-        <select class="form-select" aria-label="Select slot" id="slot_selector">
-         <option hidden selected>Select the slot whose inventory you want to analyze</option>`;
-  let selector = select.getElementsByTagName("select")[0];
+  const select = document.getElementById("slot_select");
+  let options = '<option hidden selected value="">Chọn nhân vật</option>';
   for (let i = 0; i < 10; i++) {
-    if (slot_name_list[i] === "") {
-      selector.innerHTML += `<option value="${i}" disabled> - </option>`;
-    } else {
-      selector.innerHTML += `<option value="${i}"> ${slot_name_list[i]} </option>`;
-    }
+    if (slot_name_list[i] === "") continue;
+    const safe = slot_name_list[i].replace(/[<>&"]/g, "");
+    options += `<option value="${i}">${safe}</option>`;
   }
+  select.innerHTML = `<label class="slot-label" for="slot_selector">Nhân vật</label>
+    <select class="er-select" id="slot_selector">${options}</select>`;
   select.style.display = "block";
 }
 
@@ -633,16 +647,42 @@ function createImageHtml(itemName, categoryName) {
     <br>`.trim();
 }
 
+var item_locations = null;
+const MAPGENIE = {
+  b: { url: "https://mapgenie.io/elden-ring/maps/the-lands-between", name: "Lands Between" },
+  s: { url: "https://mapgenie.io/elden-ring/maps/the-shadow-realm", name: "Realm of Shadow" },
+};
+
+function createLocationHtml(itemName) {
+  if (item_locations === null) {
+    item_locations = {};
+    fetchJson("assets/json/locations.json", (data) => (item_locations = data));
+  }
+  const hits = item_locations[itemName];
+  if (!hits || !hits.length) {
+    return `<span class="card-loc none">—</span>`;
+  }
+  const map = hits[0][0];
+  const ids = hits.filter((h) => h[0] === map).map((h) => h[1]);
+  const region = hits[0][2] || MAPGENIE[map].name;
+  const more = hits.length > 1 ? ` +${hits.length - 1}` : "";
+  const pin = `<svg viewBox="0 0 11 13" aria-hidden="true"><path d="M5.5 0A5.5 5.5 0 0 0 0 5.5C0 9.3 5.5 13 5.5 13S11 9.3 11 5.5A5.5 5.5 0 0 0 5.5 0zm0 7.6a2.1 2.1 0 1 1 0-4.2 2.1 2.1 0 0 1 0 4.2z" fill="currentColor"/></svg>`;
+  return `<a class="card-loc" href="${MAPGENIE[map].url}?locationIds=${ids.join(",")}" target="_blank" rel="noopener"
+            title="Xem vị trí trên Map Genie">${pin}<span>${region}${more}</span></a>`;
+}
+
 function getCard(itemName, categoryName = "") {
   const { url, cardClass } = getCardMetadata(itemName, categoryName);
   const imgHtml = createImageHtml(itemName, categoryName);
+  const locHtml = createLocationHtml(itemName);
 
   return `
     <div class="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2">
       <div class="${cardClass}" title="${itemName}">
         ${imgHtml}
         <p class="card-text">${itemName}</p>
-        <a href="${url}" class="stretched-link" target="_blank"></a>
+        <a href="${url}" class="stretched-link" target="_blank" rel="noopener" title="Mở trên wiki"></a>
+        ${locHtml}
       </div>
     </div>`.trim();
 }
