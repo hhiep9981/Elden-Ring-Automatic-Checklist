@@ -176,6 +176,7 @@ function calculate() {
   } catch (e) {}
   renderSourceTabs();
   showSource(active_source);
+  if (typeof wtOnResults === "function") wtOnResults();
 }
 
 function sourceTotals(res) {
@@ -212,8 +213,8 @@ function showSource(key) {
   });
   result = results_by_source[key];
   item_counter = result.counter;
-  $("#owned").load("page_parts.html?v=202610210201 #owned_section", () => {
-    $("#not-owned").load("page_parts.html?v=202610210201 #not-owned-section", () => {
+  $("#owned").load("page_parts.html?v=202610210244 #owned_section", () => {
+    $("#not-owned").load("page_parts.html?v=202610210244 #not-owned-section", () => {
       document.getElementById("collapse_button1").style.display = "block";
       document.getElementById("collapse_button2").style.display = "block";
       addFraction();

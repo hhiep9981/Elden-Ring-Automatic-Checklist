@@ -8,7 +8,7 @@
   <meta name="description" content="Elden Ring save checklist" />
   <link rel="icon" href="assets/img/favicon.ico" />
   <link rel="stylesheet" href="assets/bootstrap/css/bootstrap.min.css" />
-  <link rel="stylesheet" href="assets/css/new_style.css?v=202610210201" />
+  <link rel="stylesheet" href="assets/css/new_style.css?v=202610210244" />
 </head>
 
 <body>
@@ -48,7 +48,16 @@
       <section id="char_stats" class="panel stats-panel" style="display: none"></section>
     </div>
 
-    <section class="results">
+    <nav class="view-tabs" role="tablist">
+      <button type="button" class="view-tab active" data-view="checklist">Checklist</button>
+      <button type="button" class="view-tab" data-view="walkthrough">Walkthrough</button>
+    </nav>
+
+    <section id="view-walkthrough" class="walkthrough" style="display: none">
+      <div id="wt-root"><div class="wt-hint">Đang tải walkthrough…</div></div>
+    </section>
+
+    <section class="results" id="view-checklist">
       <div id="source_tabs" class="source-tabs" role="tablist" style="display: none"></div>
       <div id="collapse_button1" style="display: none">
         <button class="section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#owned">
@@ -75,11 +84,12 @@
 
   <button type="button" id="btn-back-to-top" aria-label="Lên đầu trang">↑</button>
 
-  <script src="assets/js/script.js?v=202610210201"></script>
-  <script src="assets/js/button_to_top.js?v=202610210201"></script>
+  <script src="assets/js/script.js?v=202610210244"></script>
+  <script src="assets/js/button_to_top.js?v=202610210244"></script>
   <script src="assets/js/jquery.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-  <script src="assets/js/cloud.js?v=202610210201"></script>
+  <script src="assets/js/cloud.js?v=202610210244"></script>
+  <script src="assets/js/walkthrough.js?v=202610210244"></script>
   <script src="assets/bootstrap/js/bootstrap.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.lazy/1.7.9/jquery.lazy.min.js"></script>
   <script>
