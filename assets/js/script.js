@@ -125,26 +125,23 @@ function runesForNextLevel(level) {
 
 function renderCharacterStats(s) {
   const el = document.getElementById("char_stats");
-  const arrow = `<svg viewBox="0 0 15 12" aria-hidden="true"><path d="M0 4.2h8.5V0L15 6l-6.5 6V7.8H0z" fill="currentColor"/></svg>`;
-  const row = (label, cur, next, extraClass = "") => `
+  const row = (label, value, extraClass = "") => `
     <div class="stat-row">
       <span class="label">${label}</span>
-      <span class="cur">${cur}</span>
-      <span class="arrow">${cur === "" ? "" : arrow}</span>
-      <span class="new ${extraClass}"><i class="chev">‹</i>${next}<i class="chev">›</i></span>
+      <span class="cur ${extraClass}">${value}</span>
     </div>`;
   const needed = runesForNextLevel(s.level);
   const attrs = Object.entries(s.attributes)
-    .map(([k, v]) => row(k, v, v))
+    .map(([k, v]) => row(k, v))
     .join("");
   const icon = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20c0-4 1-7 3-9l-2-3c-.6-1 .2-2.3 1.4-2l3.6 1c1.6.4 2.6 2 2.2 3.6L13 12c2.5-.5 5 .8 6 3.2.6 1.6-.6 3.3-2.3 3.3H8.5" fill="none" stroke="#c9a961" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   el.innerHTML = `
     <div class="stats-name">${s.name.replace(/[<>&]/g, "")}</div>
     <div class="stat-group">
-      ${row("Level", s.level, s.level)}
+      ${row("Level", s.level)}
       <div class="stat-gap"></div>
-      ${row("Runes Held", s.runes, s.runes)}
-      ${row("Runes Needed", "", needed, s.runes < needed ? "short" : "")}
+      ${row("Runes Held", s.runes)}
+      ${row("Runes Needed", needed, s.runes < needed ? "short" : "")}
     </div>
     <div class="stat-header">${icon}<span>Attribute Points</span></div>
     <div class="stat-group attrs">${attrs}</div>`;
@@ -154,23 +151,84 @@ function renderCharacterStats(s) {
     rows.forEach((x) => x.classList.remove("is-active"));
     r.classList.add("is-active");
   }));
-  if (rows[0]) rows[0].classList.add("is-active");
 }
+
+const SOURCES = [
+  { key: "main", label: "Main Game" },
+  { key: "dlc", label: "DLC" },
+  { key: "unobtainable", label: "Unobtainable" },
+];
+let results_by_source = {};
+let active_source = "main";
 
 function calculate() {
   let options = $("#slot_selector option:selected");
   let selected_slot = options[0].value;
-  getJsonFiles();
-  result = getOwnedAndNot(file_read, selected_slot);
-  if (result["worked"]) {
-    $("#owned").load("page_parts.html #owned_section", () => {
-      $("#not-owned").load("page_parts.html #not-owned-section", () => {
-        document.getElementById("collapse_button1").style.display = "block";
-        document.getElementById("collapse_button2").style.display = "block";
-        addFraction();
-      });
-    });
+  results_by_source = {};
+  for (const { key } of SOURCES) {
+    getJsonFiles(key);
+    results_by_source[key] = getOwnedAndNot(file_read, selected_slot);
   }
+  if (!results_by_source.main.worked) return;
+  try {
+    const saved = localStorage.getItem("er_source");
+    if (saved && results_by_source[saved]) active_source = saved;
+  } catch (e) {}
+  renderSourceTabs();
+  showSource(active_source);
+}
+
+function sourceTotals(res) {
+  let owned = 0, total = 0;
+  for (const cat in res.counter) {
+    const s = res.counter[cat]?.summary;
+    if (s) { owned += s.owned; total += s.total; }
+  }
+  return { owned, total };
+}
+
+function renderSourceTabs() {
+  const el = document.getElementById("source_tabs");
+  el.innerHTML = SOURCES.map(({ key, label }) => {
+    const t = sourceTotals(results_by_source[key]);
+    return `<button type="button" class="source-tab" data-source="${key}" role="tab">
+      <span class="source-label">${label}</span>
+      <span class="source-count">${t.owned}<span>/${t.total}</span></span>
+    </button>`;
+  }).join("");
+  el.querySelectorAll(".source-tab").forEach((b) =>
+    b.addEventListener("click", () => showSource(b.dataset.source))
+  );
+  el.style.display = "grid";
+}
+
+function showSource(key) {
+  active_source = key;
+  try { localStorage.setItem("er_source", key); } catch (e) {}
+  document.querySelectorAll(".source-tab").forEach((b) => {
+    const on = b.dataset.source === key;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-selected", on);
+  });
+  result = results_by_source[key];
+  item_counter = result.counter;
+  $("#owned").load("page_parts.html #owned_section", () => {
+    $("#not-owned").load("page_parts.html #not-owned-section", () => {
+      document.getElementById("collapse_button1").style.display = "block";
+      document.getElementById("collapse_button2").style.display = "block";
+      addFraction();
+      // hide categories that have nothing in this source
+      for (const cat in item_counter) {
+        const s = item_counter[cat]?.summary;
+        if (s && s.total === 0) {
+          ["owned", "not-owned"].forEach((o) => {
+            const box = document.getElementById(`${o}-${cat}`);
+            if (box) { box.style.display = "none"; if (box.previousElementSibling) box.previousElementSibling.style.display = "none"; }
+          });
+        }
+      }
+    });
+  });
 }
 
 function fetchJson(url, callback) {
@@ -182,83 +240,37 @@ function fetchJson(url, callback) {
   });
 }
 
-function getJsonFiles() {
-  fetchJson("assets/json/all_items.json", function (data) {
-    all_items = { ...data };
+// Build all_items for one source: "main", "dlc" or "unobtainable"
+function getJsonFiles(source = "main") {
+  const flagFiles = ["bosses", "graces", "cookbooks", "bell_bearings", "whetblades", "tools", "gestures", "crystal_tears"];
+  all_items = {};
 
+  if (source === "main") {
+    fetchJson("assets/json/all_items.json", (data) => (all_items = { ...data }));
     if ($("#altered-armor").is(":checked")) {
-      fetchJson("assets/json/altered_armor.json", function (data2) {
-        all_items.armor = { ...all_items.armor, ...data2 };
+      fetchJson("assets/json/altered_armor.json", (data) => {
+        all_items.armor = { ...all_items.armor, ...data };
       });
     }
-
-    if ($("#unobtainable-items").is(":checked")) {
-      fetchJson("assets/json/unobtainable.json", function (data2) {
-        all_items.armor = { ...all_items.armor, ...data2.armor };
-        all_items.talisman = { ...all_items.talisman, ...data2.talisman };
-      });
-    }
-
-    // Load bosses.json
-    fetchJson("assets/json/bosses.json", function (data) {
-      all_items.bosses = { ...data.bosses };
+    flagFiles.forEach((name) => {
+      fetchJson(`assets/json/${name}.json`, (data) => (all_items[name] = { ...data[name] }));
     });
-    fetchJson("assets/json/graces.json", function (data) {
-      all_items.graces = { ...data.graces };
+  } else if (source === "dlc") {
+    fetchJson("assets/json/dlc_items.json", (data) => {
+      for (const cat in data) all_items[cat] = { ...data[cat] };
     });
-    fetchJson("assets/json/cookbooks.json", function (data) {
-      all_items.cookbooks = { ...data.cookbooks };
+  } else if (source === "unobtainable") {
+    fetchJson("assets/json/unobtainable.json", (data) => {
+      all_items.armor = { ...data.armor };
+      all_items.talisman = { ...data.talisman };
     });
-    fetchJson("assets/json/bell_bearings.json", function (data) {
-      all_items.bell_bearings = { ...data.bell_bearings };
-    });
-    fetchJson("assets/json/whetblades.json", function (data) {
-      all_items.whetblades = { ...data.whetblades };
-    });
-    fetchJson("assets/json/tools.json", function (data) {
-      all_items.tools = { ...data.tools };
-    });
-    fetchJson("assets/json/gestures.json", function (data) {
-      all_items.gestures = { ...data.gestures };
-    });
-    fetchJson("assets/json/crystal_tears.json", function (data) {
-      all_items.crystal_tears = { ...data.crystal_tears };
-    });
+  }
 
-    if ($("#dlc-items").is(":checked")) {
-      fetchJson("assets/json/dlc_items.json", function (data2) {
-        all_items.armament = { ...all_items.armament, ...data2.armament };
-        all_items.armor = { ...all_items.armor, ...data2.armor };
-        all_items.talisman = { ...all_items.talisman, ...data2.talisman };
-        all_items.ashesOfWar = { ...all_items.ashesOfWar, ...data2.ashesOfWar };
-        all_items.magic = { ...all_items.magic, ...data2.magic };
-        all_items.spiritAshes = { ...all_items.spiritAshes, ...data2.spiritAshes };
-        all_items.bosses = { ...all_items.bosses, ...data2.bosses };
-        all_items.graces = { ...all_items.graces, ...data2.graces };
-        all_items.cookbooks = { ...all_items.cookbooks, ...data2.cookbooks };
-        all_items.bell_bearings = { ...all_items.bell_bearings, ...data2.bell_bearings };
-        all_items.whetblades = { ...all_items.whetblades, ...data2.whetblades };
-        all_items.tools = { ...all_items.tools, ...data2.tools };
-        all_items.gestures = { ...all_items.gestures, ...data2.gestures };
-        all_items.crystal_tears = { ...all_items.crystal_tears, ...data2.crystal_tears };
-      });
-    }
-  });
-
-
-  fetchJson("assets/json/item_dict_template.json", function (data) {
-    item_dict_template = { ...data };
-  });
-
-  fetchJson("assets/json/item_counter.json", function (data) {
-    item_counter = { ...data };
-  });
-
-
-  fetchJson("assets/json/eventflag_bst.json", function (data) {
-    eventflag_bst_map = { ...data };
-  });
-
+  fetchJson("assets/json/item_dict_template.json", (data) => (item_dict_template = { ...data }));
+  fetchJson("assets/json/item_counter.json", (data) => (item_counter = { ...data }));
+  if (!eventflag_bst_map) {
+    fetchJson("assets/json/eventflag_bst.json", (data) => (eventflag_bst_map = { ...data }));
+  }
 }
 
 function get_slot_ls(dat) {
